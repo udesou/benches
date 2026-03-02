@@ -146,15 +146,66 @@ Build approach is either **ocamlopt** (single `.ml` compiled directly) or **dune
 - **Description:** Zero-suppressed Binary Decision Diagram (ZDD) operations over an English word dictionary. Builds a ZDD from all words, then counts matches for a pattern query. Exercises pointer-heavy DAG structures similar to `bdd`.
 - **Note:** The run cwd is a temp dir, so the word file must be passed as an absolute path.
 
+### fannkuchredux
+
+- **Source:** sandmark `benchmarks/benchmarksgame/fannkuchredux.ml`
+- **Build:** ocamlopt (stdlib only), compiled with `-noassert -unsafe` as in sandmark
+- **Args:** `<N>` — permutation length; config uses `11`
+- **Description:** Counts the maximum number of flips needed to sort a permutation, and sums the sign of each intermediate permutation (Pfannkuchen benchmark). Pure computation with no allocation; useful as a control benchmark where GC has negligible impact.
+
+### numerical-analysis
+
+Six benchmarks sharing `benches/numerical-analysis/`. Each has its own build script; two require two source files compiled in order.
+
+#### crout_decomposition
+
+- **Source:** sandmark `benchmarks/numerical-analysis/crout_decomposition.ml` (originally OCamlPro's ocamlbench-repo)
+- **Build:** ocamlopt (stdlib only)
+- **Args:** _(none)_
+- **Description:** Crout matrix decomposition (LU factorisation variant) on a fixed matrix. Dense linear algebra; exercises float array allocation.
+
+#### qr_decomposition
+
+- **Source:** sandmark `benchmarks/numerical-analysis/qr_decomposition.ml` (originally OCamlPro's ocamlbench-repo)
+- **Build:** ocamlopt (stdlib only)
+- **Args:** _(none)_
+- **Description:** QR decomposition via Gram-Schmidt on a fixed matrix. Dense linear algebra; similar allocation profile to `crout_decomposition`.
+
+#### durand_kerner_aberth
+
+- **Source:** sandmark `benchmarks/numerical-analysis/durand_kerner_aberth.ml` (originally OCamlPro's ocamlbench-repo)
+- **Build:** ocamlopt (stdlib only)
+- **Args:** _(none)_ — optional percentage of coefficient array (default 100); runs 10 iterations
+- **Description:** Finds all roots of a polynomial simultaneously using the Durand–Kerner / Weierstrass method. Complex-number arithmetic on float arrays.
+
+#### fft
+
+- **Source:** sandmark `benchmarks/numerical-analysis/fft.ml` (originally OCamlPro's ocamlbench-repo)
+- **Build:** ocamlopt + `unix.cmxa` (uses `Unix.times` for timing output)
+- **Args:** _(none)_ — optional array size (default 1048576)
+- **Description:** Cooley–Tukey FFT followed by inverse FFT on a complex float array. In-place computation; exercises large float array allocation and cache effects.
+
+#### levinson_durbin
+
+- **Source:** sandmark `benchmarks/numerical-analysis/levinson_durbin.ml` + `levinson_durbin_dataset.ml`
+- **Build:** ocamlopt (stdlib only), two-file: dataset compiled first
+- **Args:** _(none)_
+- **Description:** Levinson–Durbin recursion for autoregressive modelling of Japanese vowel sound data. Exercises float array allocation with a real-world-sized numerical dataset.
+
+#### naive_multilayer
+
+- **Source:** sandmark `benchmarks/numerical-analysis/naive_multilayer.ml` + `naive_multilayer_dataset.ml`
+- **Build:** ocamlopt (stdlib only), two-file: dataset compiled first
+- **Args:** _(none)_
+- **Description:** Naive multilayer neural network (forward pass + backpropagation) on the UCI Ionosphere dataset. Dense matrix operations; exercises both float array allocation and functional list structure.
+
 ---
 
 ## TODO — Benchmarks Not Yet Added
 
-### Easy to add (stdlib or `unix` only, no external packages)
+### Requires more involved build (no external packages)
 
-- **`numerical-analysis` programs** — `crout_decomposition`, `qr_decomposition`, `durand_kerner_aberth`, `levinson_durbin`, `naive_multilayer` are stdlib-only; `fft` additionally needs `unix`. All single-file or two-file benchmarks that can be compiled with `ocamlopt` directly.
-- **`benchmarksgame/fannkuchredux`** — Has its own `executable` stanza with no library dependencies (unlike the rest of benchmarksgame). Single file; `ocamlopt` build.
-- **`graph500seq`** — Builds internally-defined libraries only (no external opam packages), but has a data-generation step (`gen.exe` must run first to produce `edges.data`) which makes the build script more involved.
+- **`graph500seq`** — Builds internally-defined libraries only (no external opam packages), but the dune file defines multiple library stanzas with inter-dependencies, and a data-generation step (`gen.exe` must run first to produce `edges.data`). Needs a more involved build script than the standard ocamlopt template.
 
 ### Need external opam packages
 
