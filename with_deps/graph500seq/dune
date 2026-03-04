@@ -1,0 +1,33 @@
+; graphTypes is defined in sandmark via a parent dune-project scope.
+; Defined here explicitly for standalone builds.
+(library (name graphTypes) (modules graphTypes))
+
+(library
+  (name generateSeq)
+  (modules generateSeq)
+  (libraries graphTypes)
+)
+
+(executable
+  (name gen)
+  (modules gen)
+  (libraries unix generateSeq)
+)
+
+(library
+  (name sparseGraphSeq)
+  (modules sparseGraphSeq)
+  (libraries graphTypes)
+)
+
+(library
+  (name kernel1Seq)
+  (modules kernel1Seq)
+  (libraries generateSeq sparseGraphSeq unix)
+)
+
+(executable
+  (name kernel1_run)
+  (modules kernel1_run)
+  (libraries graphTypes generateSeq kernel1Seq unix)
+)
