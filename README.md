@@ -6,12 +6,13 @@ This repo is intended to be referenced from `running-ng` configs via absolute pa
 
 ## Directory Layout
 
-Benchmarks are organised into two top-level groups:
+Benchmarks are organised into three top-level groups:
 
 ```text
 benches/
   simple/         # stdlib / unix only; single build script, no generated data
   with_deps/      # require dune multi-library builds or generated input data
+  with_packages/  # require external opam packages (zarith, lwt, decompress, yojson, …)
 ```
 
 Each benchmark lives in its own subfolder:
@@ -162,7 +163,7 @@ Build approach is either **ocamlopt** (single `.ml` compiled directly) or **dune
 
 - **Source:** sandmark `benchmarks/zdd/`
 - **Build:** ocamlopt (stdlib only)
-- **Args:** `<words-file>` — absolute path to `words.txt`; use `/home/udesou/benches/zdd/words.txt`
+- **Args:** `<words-file>` — absolute path to `words.txt`; use `/home/udesou/benches/simple/zdd/words.txt`
 - **Description:** Zero-suppressed Binary Decision Diagram (ZDD) operations over an English word dictionary. Builds a ZDD from all words, then counts matches for a pattern query. Exercises pointer-heavy DAG structures similar to `bdd`.
 - **Note:** The run cwd is a temp dir, so the word file must be passed as an absolute path.
 
@@ -219,6 +220,13 @@ Six benchmarks sharing `benches/numerical-analysis/`. Each has its own build scr
 - **Args:** _(none)_
 - **Description:** Naive multilayer neural network (forward pass + backpropagation) on the UCI Ionosphere dataset. Dense matrix operations; exercises both float array allocation and functional list structure.
 
+### sequence_cps
+
+- **Source:** sandmark `benchmarks/sequence/sequence_cps.ml` (originally OCamlPro's ocamlbench-repo)
+- **Build:** ocamlopt (stdlib only)
+- **Args:** `<N>` — sequence length; config uses `10000`
+- **Description:** Builds a lazy CPS-style sequence of integers 0…N, then maps, filters, and folds it to compute a sum. Exercises higher-order function application and minor heap allocation in a functional pipeline; no external libraries required.
+
 ---
 
 ## with_deps benchmarks
@@ -235,24 +243,110 @@ Six benchmarks sharing `benches/numerical-analysis/`. Each has its own build scr
 
 ---
 
+## with_packages benchmarks
+
+Benchmarks in `with_packages/` require external opam packages.
+
+### Setup: opam-managed compilers
+
+For compilers installed via opam (e.g. `ocaml-v5.4`, `ocaml-v4.14.3`), the build scripts auto-install the required packages into the correct switch on first use — no manual setup needed.
+
+### Setup: custom / dev compilers
+
+For a compiler built from source (e.g. `ocaml-release` pointing to a commit), `ocaml-system` in the opam repository only exists for published release versions. If your build's `ocaml -vnum` returns a non-release string (e.g. `5.4.1+dev`), you need to create the opam switch manually once:
+
+```bash
+# Set PATH to the custom compiler
+export PATH="/path/to/custom/ocaml/bin:$PATH"
+
+# For a clean release version (ocaml -vnum = "5.4.1"):
+opam switch create my-custom-switch --packages ocaml-system --no-switch
+
+# For a dev/trunk version, pin ocaml-system to the clean version number:
+VNUM=$(ocaml -vnum | grep -oP '^\d+\.\d+\.\d+')
+opam switch create my-custom-switch --packages "ocaml-system.${VNUM}" --no-switch
+```
+
+Then tell the build scripts which switch to use by adding `build_env` to the suite in the YAML:
+
+```yaml
+sandmark-with-packages:
+  type: OCamlBenchmarkSuite
+  build_env:
+    OPAM_SWITCH: "my-custom-switch"
+  programs:
+    fasta3: ...
+```
+
+`OPAM_SWITCH` takes precedence over all auto-detection; the build scripts install the required packages into that switch and use it for all dune builds.
+
+The `sandmark-with-packages` suite in the YAML config is commented out by default; uncomment it once the packages are available in the target switch.
+
+### benchmarksgame
+
+Seven programs sharing `benches/with_packages/benchmarksgame/`. Each has its own build script; all use dune and link against `zarith`, `str`, and `unix`.
+
+- **binarytrees5** — Args: `21`. Allocates and traverses binary trees of depth 21 using Zarith big integers for node values. GC-intensive short-lived allocation.
+- **fasta3** — Args: `25000000`. Generates a DNA sequence of 25M characters using cumulative probability tables. Exercises sequential array access.
+- **fasta6** — Args: `25000000`. Alternative fasta generator; same input size, different internal algorithm.
+- **mandelbrot6** — Args: `16000`. Renders a 16000×16000 Mandelbrot set image in PBM format. Pure floating-point; no GC pressure.
+- **nbody** — Args: `50000000`. N-body planetary simulation (5 bodies, 50M steps). Pure floating-point; tests float unboxing.
+- **pidigits5** — Args: `10000`. Computes 10000 digits of π using the Stern-Brocot tree algorithm via Zarith arbitrary-precision integers.
+- **spectralnorm2** — Args: `5500`. Approximates the spectral norm of an infinite matrix. Dense floating-point; exercises float arrays.
+
+### zarith
+
+Four programs sharing `benches/with_packages/zarith/`. Each has its own build script; all use dune.
+
+- **zarith_fact** — Args: `40 1000000`. Computes factorial of 40, repeated 1M times. Exercises Zarith multiplication. Needs `zarith`.
+- **zarith_fib** — Args: `Z 40`. Fibonacci of 40 using Zarith big integers. Exercises Zarith addition. Needs `zarith`, `num`.
+- **zarith_pi** — Args: `10000`. Computes 10000 π digits via the Stern-Brocot streaming algorithm. Exercises Zarith division/comparison. Needs `zarith`.
+- **zarith_tak** — Args: `Z 2500`. Tak function with n=2500 using Zarith integers. Exercises recursive calls with big-integer arithmetic. Needs `zarith`, `num`.
+
+### chameneos_redux_lwt
+
+- **Source:** sandmark `benchmarks/chameneos/`
+- **Build:** dune + `lwt.unix`
+- **Args:** `<meetings>` — number of colour-changing meetings; config uses `600000`
+- **Description:** Simulates chameneos creatures meeting in a waiting room and swapping colours, implemented with Lwt lightweight threads. Exercises Lwt cooperative scheduling and mvar synchronisation.
+
+### thread_ring_lwt_mvar / thread_ring_lwt_stream
+
+Both in `benches/with_packages/thread-lwt/`; shared dune file.
+
+- **Source:** sandmark `benchmarks/thread-lwt/`
+- **Build:** dune + `lwt`, `lwt.unix`
+- **Args:** `<N>` — number of ring-pass iterations; config uses `20000`
+- **thread_ring_lwt_mvar** — Token passed around a ring of 503 Lwt threads via `Lwt_mvar`. Exercises mvar hand-off latency.
+- **thread_ring_lwt_stream** — Same ring, but using `Lwt_stream` channels. Slightly higher allocation than the mvar variant.
+
+### test_decompress
+
+- **Source:** sandmark `benchmarks/decompress/test_decompress.ml`
+- **Build:** dune + `bigstringaf`, `checkseum.ocaml`, `decompress.zl`
+- **Args:** _(none)_ — defaults to 64 compress/decompress iterations on 32 KB of data
+- **Description:** Microbenchmark for the `decompress` pure-OCaml zlib implementation. Compresses then decompresses a block of data in a loop. Exercises allocation of `Bigarray`-backed buffers and the functional zipper-style stream API.
+
+### ydump
+
+- **Source:** sandmark `benchmarks/yojson/ydump.ml`
+- **Build:** dune + `yojson`, `camlp-streams`
+- **Args:** `-c <json-file>` — compact-print a JSON file; config uses the bundled `sample.json` (absolute path required since run cwd is a temp dir)
+- **Description:** Parses and pretty-prints a JSON document using the Yojson library. Exercises OCaml's `Buffer`-based output, recursive tree traversal, and moderate allocation from parsing.
+
+---
+
 ## TODO — Benchmarks Not Yet Added
 
-### Need external opam packages
+### Need external opam packages (not yet integrated)
 
-These benchmarks require packages that must be installed into the target opam switch before building.
+These benchmarks were not added because their dependencies are complex or unusual.
 
-- **`benchmarksgame` (most programs)** — `binarytrees5`, `fasta`, `knucleotide`, `mandelbrot6`, `nbody`, `pidigits5`, `regexredux2`, `revcomp2`, `spectralnorm2` all depend on `zarith` (and some on `str`).
-- **`zarith`** — The sandmark `zarith` benchmark itself (`zarith_fact`, `zarith_fib`, `zarith_pi`, `zarith_tak`) requires the `zarith` package.
-- **`chameneos`** — Requires `lwt`.
-- **`thread-lwt`** — Requires `lwt`.
-- **`valet`** — Requires `lwt` and `react`.
-- **`sequence`** — Requires `lwt`.
-- **`decompress`** — Requires the `decompress` package.
+- **`valet`** — Requires `lwt`, `react`, and `uuidm`; unusual event-loop structure.
+- **`simple-tests` (partial)** — `ocamlcapi` and `weak_htbl` require C stubs or special build setup; `pingpong_multicore` requires `domainslib`.
 - **`irmin`** — Requires `irmin`, `irmin-pack`, `index`, and related packages.
 - **`owl`** — Requires `owl-base`.
-- **`yojson`** — Requires `yojson` and `ppx_deriving_yojson`.
 - **`mpl`** — Requires several packages (`mtime`, `progress`, etc.).
-- **`simple-tests` (partial)** — `ocamlcapi` and `weak_htbl` require C stubs or special build setup; `pingpong_multicore` requires `domainslib`.
 
 ### Need multicore / OCaml 5 effects
 

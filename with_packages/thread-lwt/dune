@@ -1,0 +1,3 @@
+(executables
+  (names thread_ring_lwt_mvar thread_ring_lwt_stream)
+  (libraries lwt lwt.unix))

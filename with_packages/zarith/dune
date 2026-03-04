@@ -1,0 +1,4 @@
+(executable (name zarith_fact) (modules zarith_fact) (libraries zarith))
+(executable (name zarith_fib) (modules zarith_fib) (libraries zarith num))
+(executable (name zarith_pi) (modules zarith_pi) (libraries zarith))
+(executable (name zarith_tak) (modules zarith_tak) (libraries zarith num))

@@ -10,6 +10,9 @@
 *.cmti
 *.annot
 
+# Benchmark data
+*.data
+
 # Dune build artifacts
 _build/
 _build-running/

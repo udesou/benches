@@ -1,0 +1,4 @@
+(executables
+  (names binarytrees5 fasta3 fasta6 mandelbrot6 nbody pidigits5 spectralnorm2)
+  (modules binarytrees5 fasta3 fasta6 mandelbrot6 nbody pidigits5 spectralnorm2)
+  (libraries unix str zarith))
