@@ -372,6 +372,219 @@ Single-file effect benchmarks compiled with `ocamlopt`. Adapted from sandmark `b
 - **Args:** `<iters> <m> <n>` — default `2 3 11` (expected output per iter: 16381)
 - **Description:** Ackermann function. Same pattern; tests effect handler overhead on a deeply recursive, stack-intensive computation.
 
+### multicore/multicore-structures
+
+Lock-free concurrent data structures implemented with OCaml 5 stdlib `Atomic`. No external packages required — the sandmark originals referenced `kcas`, but all atomic operations (`Atomic.t`, `Atomic.get`, `Atomic.set`, `Atomic.compare_and_set`) are available in the stdlib since OCaml 5.0. Each test program is compiled together with its data-structure module using `ocamlfind -package unix`.
+
+**Data structure modules** (in the benchmark directory, compiled alongside each test):
+- `ms_queue.ml` — Michael–Scott lock-free MPMC queue using `Atomic.t` and CAS loops.
+- `treiber_stack.ml` — Treiber lock-free LIFO stack using `Atomic.t`.
+- `spsc_queue.ml` — Wait-free bounded SPSC queue with cache-line padding.
+
+#### test_queue_sequential
+
+- **Source:** sandmark `benchmarks/multicore-structures/test_queue_sequential.ml`
+- **Build:** ocamlfind + unix (stdlib Atomic, no domainslib)
+- **Args:** `<items>` — number of items to enqueue/dequeue
+- **Description:** Sequentially enqueues then dequeues `<items>` integers through the MS queue. Checks that no items are lost and reports throughput (items/ms).
+
+#### test_queue_parallel
+
+- **Source:** sandmark `benchmarks/multicore-structures/test_queue_parallel.ml`
+- **Build:** ocamlfind + unix
+- **Args:** `<items>`
+- **Description:** One domain enqueues `<items>` integers while a second domain concurrently dequeues. Exercises the MS queue's CAS-based enqueue/dequeue paths under concurrent access.
+
+#### test_stack_sequential
+
+- **Source:** sandmark `benchmarks/multicore-structures/test_stack_sequential.ml`
+- **Build:** ocamlfind + unix
+- **Args:** `<items>`
+- **Description:** Sequential push/pop stress test on the Treiber stack.
+
+#### test_stack_parallel
+
+- **Source:** sandmark `benchmarks/multicore-structures/test_stack_parallel.ml`
+- **Build:** ocamlfind + unix
+- **Args:** `<items>`
+- **Description:** Concurrent push (one domain) / pop (another domain) on the Treiber stack.
+
+#### test_spsc_queue_sequential
+
+- **Source:** sandmark `benchmarks/multicore-structures/test_spsc_queue_sequential.ml`
+- **Build:** ocamlfind + unix
+- **Args:** `<items>` — items per run; repeats 1000 times
+- **Description:** Sequential enqueue/dequeue cycle on the SPSC queue. Reports ns/item throughput.
+
+#### test_spsc_queue_parallel
+
+- **Source:** sandmark `benchmarks/multicore-structures/test_spsc_queue_parallel.ml`
+- **Build:** ocamlfind + unix
+- **Args:** `<items>`
+- **Description:** One domain enqueues while another dequeues via the SPSC queue. Exercises the wait-free fast path.
+
+#### test_spsc_queue_pingpong_parallel
+
+- **Source:** sandmark `benchmarks/multicore-structures/test_spsc_queue_pingpong_parallel.ml`
+- **Build:** ocamlfind + unix
+- **Args:** `<num_threads> <num_messages>`
+- **Description:** Creates a ring of `<num_threads>` domains, each connected to the next by an SPSC queue. `Ping` messages circulate until a `Bye` terminates each thread. Measures inter-domain message-passing latency through a chain of SPSC queues.
+
+### multicore/multicore-numerical
+
+Parallel versions of classic numerical benchmarks using `domainslib`. Each multicore benchmark has a corresponding sequential baseline. All compiled with `ocamlfind -package domainslib` (or stdlib-only for sequentials). First argument is always `<num_domains>`.
+
+#### mandelbrot6_multicore
+
+- **Source:** sandmark `benchmarks/multicore-numerical/mandelbrot6_multicore.ml`
+- **Build:** ocamlfind + domainslib
+- **Args:** `<num_domains> <width>` — default `1 200`
+- **Description:** Parallel Mandelbrot set renderer. Uses `Task.parallel_for` over rows; each domain computes a horizontal strip. Outputs PBM binary format to stdout. Based on benchmarksgame Mandelbrot #6.
+
+#### nbody_multicore / nbody
+
+- **Source:** sandmark `benchmarks/multicore-numerical/{nbody_multicore,nbody}.ml`
+- **Build:** ocamlfind + domainslib (multicore); ocamlopt stdlib (sequential)
+- **Args:** `<num_domains> <n> <num_bodies>` — default `1 500 1024`; sequential: `<n> <num_bodies>` — default `500 1024`
+- **Description:** N-body gravitational simulation. Parallel version uses `Task.parallel_for` for the velocity-update inner loop and `Task.parallel_for_reduce` for energy computation.
+
+#### floyd_warshall_multicore / floyd_warshall
+
+- **Source:** sandmark `benchmarks/multicore-numerical/{floyd_warshall_multicore,floyd_warshall}.ml`
+- **Build:** ocamlfind + domainslib; stdlib
+- **Args:** `<num_domains> <n>` — default `1 4`; sequential: `<n>` — default `4`
+- **Description:** All-pairs shortest path (Floyd–Warshall). The outer `k` loop is sequential (dependency), inner `i` loop parallelised with `Task.parallel_for`. Uses an algebraic `edge` type (`Value of int | Infinity`).
+
+#### game_of_life_multicore / game_of_life
+
+- **Source:** sandmark `benchmarks/multicore-numerical/{game_of_life_multicore,game_of_life}.ml`
+- **Build:** ocamlfind + domainslib; stdlib
+- **Args:** `<num_domains> <n_times> <board_size>` — default `1 2 1024`; sequential: `<n_times> <board_size>` — default `2 1024`
+- **Description:** Conway's Game of Life on a `board_size × board_size` grid, iterated `n_times` steps. Row updates parallelised with `Task.parallel_for`.
+
+#### binarytrees5_multicore
+
+- **Source:** sandmark `benchmarks/multicore-numerical/binarytrees5_multicore.ml`
+- **Build:** ocamlfind + domainslib
+- **Args:** `<num_domains> <max_depth>` — default `1 10`
+- **Description:** Binary tree construction and checksum benchmark (benchmarksgame binary-trees #5). Uses `Task.async`/`Task.await` to parallelise tree checks across depths and domains. Exercises GC allocation and domain-local work stealing.
+
+#### spectralnorm2_multicore
+
+- **Source:** sandmark `benchmarks/multicore-numerical/spectralnorm2_multicore.ml`
+- **Build:** ocamlfind + domainslib
+- **Args:** `<num_domains> <n>` — default `1 2000`
+- **Description:** Spectral norm of the infinite matrix A where `A[i,j] = 1/((i+j)*(i+j+1)/2+i+1)`. Power iteration using `Task.parallel_for` for matrix-vector products. Based on benchmarksgame spectral-norm #2.
+
+#### fannkuchredux_multicore
+
+- **Source:** sandmark `benchmarks/multicore-numerical/fannkuchredux_multicore.ml`
+- **Build:** ocamlfind + domainslib
+- **Args:** `<workers> <n>` — default `10 7`
+- **Description:** Fannkuch-redux (permutation counting). Divides the factorial permutation space into `workers` chunks and uses `Task.parallel_for` to count flip operations in parallel.
+
+#### quicksort_multicore / quicksort
+
+- **Source:** sandmark `benchmarks/multicore-numerical/{quicksort_multicore,quicksort}.ml`
+- **Build:** ocamlfind + domainslib; stdlib
+- **Args:** `<num_domains> <n>` — default `1 2000`; sequential: `<n>` — default `2000`
+- **Description:** Parallel quicksort using `Task.async`/`Task.await` to spawn recursive subproblems. Depth-bounded spawning (halves remaining depth budget at each partition).
+
+#### mergesort_multicore / mergesort
+
+- **Source:** sandmark `benchmarks/multicore-numerical/{mergesort_multicore,mergesort}.ml`
+- **Build:** ocamlfind + domainslib; stdlib
+- **Args:** `<num_domains> <n>` — default `1 1024`; sequential: `<n>` — default `1024`
+- **Description:** Parallel merge sort using `Task.async`/`Task.await`. Falls back to bubble sort below threshold (32 elements). Uses an in-place double-buffer merge strategy.
+
+#### matrix_multiplication_multicore / matrix_multiplication
+
+- **Source:** sandmark `benchmarks/multicore-numerical/{matrix_multiplication_multicore,matrix_multiplication}.ml`
+- **Build:** ocamlfind + domainslib; stdlib
+- **Args:** `<num_domains> <size>` — default `1 1024`; sequential: `<size>` — default `1024`
+- **Description:** Dense integer matrix multiplication. Row-parallel using `Task.parallel_for` over the output rows.
+
+#### matrix_multiplication_tiling_multicore
+
+- **Source:** sandmark `benchmarks/multicore-numerical/matrix_multiplication_tiling_multicore.ml`
+- **Build:** ocamlfind + domainslib
+- **Args:** `<num_domains> <size>` — default `1 1024`
+- **Description:** Tiled matrix multiplication using explicit `Domainslib.Chan`-based task distribution rather than `parallel_for`. Tile size is 64. The channel-based dispatch is chosen because the loop has decreasing work per iteration, which makes static `parallel_for` chunking suboptimal.
+
+#### LU_decomposition_multicore / LU_decomposition
+
+- **Source:** sandmark `benchmarks/multicore-numerical/{LU_decomposition_multicore,LU_decomposition}.ml`
+- **Build:** ocamlfind + domainslib; stdlib
+- **Args:** `<num_domains> <mat_size>` — default `1 1200`; sequential: `<mat_size>` — default `1200`
+- **Description:** In-place LU decomposition of a random float matrix. Uses `Task.parallel_for` for row elimination and `Domain.DLS` for domain-local random state. Stores L and U in packed form.
+
+#### nqueens_multicore / nqueens
+
+- **Source:** sandmark `benchmarks/multicore-numerical/{nqueens_multicore,nqueens}.ml`
+- **Build:** ocamlfind + domainslib; stdlib
+- **Args:** `<num_domains> <board_size>` — default `2 13`; sequential: `<board_size>` — default `13`
+- **Description:** N-queens solver. Parallel version spawns a `Task.async` for each valid queen placement at each row, aggregating results with `Task.await`.
+
+#### evolutionary_algorithm_multicore / evolutionary_algorithm
+
+- **Source:** sandmark `benchmarks/multicore-numerical/{evolutionary_algorithm_multicore,evolutionary_algorithm}.ml`
+- **Build:** ocamlfind + domainslib; stdlib
+- **Args:** `<num_domains> <n> <lambda>` — default `4 1000 1000`; sequential: `<n> <lambda>` — default `1000 1000`
+- **Description:** Minimal genetic algorithm optimising the Onemax fitness function. Parallel version uses `Task.parallel_for` to evaluate and mutate the population in each generation. Uses `Domain.DLS` for domain-local random state.
+
+### multicore/multicore-grammatrix
+
+Gram matrix benchmark from the Yamanishi laboratory. Compiled with `ocamlfind`; requires a `data/` subdirectory with CSV input files (bundled). The benchmark reads feature vectors from a CSV (space-separated floats) and computes the symmetric Gram matrix via dot products. Default input is `data/tox21_nrar_ligands_std_rand_01.csv` (7026 samples).
+
+A shared helper module `utls.ml` is compiled alongside the main benchmark in each build.
+
+#### grammatrix
+
+- **Source:** sandmark `benchmarks/multicore-grammatrix/grammatrix.ml` + `utls/utls.ml`
+- **Build:** ocamlfind + unix (sequential)
+- **Args:** `<ncores> <input_file>` — default `1 data/tox21_nrar_ligands_std_rand_01.csv`
+- **Description:** Sequential Gram matrix computation. Reads feature vectors, computes the full N×N symmetric matrix in O(N²) dot products, then prints a corner summary. The `ncores` argument is accepted but ignored (present for interface parity with the multicore version).
+
+#### grammatrix_multicore
+
+- **Source:** sandmark `benchmarks/multicore-grammatrix/grammatrix_multicore.ml` + `utls/utls.ml`
+- **Build:** ocamlfind + domainslib + unix
+- **Args:** `<num_domains> <chunk_size> <input_file>` — default `4 16 data/tox21_nrar_ligands_std_rand_01.csv`
+- **Description:** Parallel Gram matrix computation using explicit `Domainslib.Chan`-based task distribution. Work chunks of `<chunk_size>` rows are sent through a bounded channel; each domain fetches and processes chunks until a `Quit` message is received. Channel-based dispatch is preferred over `parallel_for` here because earlier rows have more work (triangular iteration), so pre-computing and queuing chunks in decreasing-work order improves load balance. **Note:** the benchmark must be run from the `multicore-grammatrix/` directory so that the `data/` relative path resolves correctly.
+
+### multicore/multicore-minilight
+
+Parallel global illumination renderer (MiniLight 1.5.2). A Monte Carlo path tracer with an octree spatial index. All nine source modules are compiled together in dependency order using `ocamlfind -package domainslib`. Only the parallel entry point (`minilight_multicore`) is provided; the sequential variant is omitted because its `camera.ml` has a different API signature.
+
+Compilation order: `vector3f → triangle → surfacePoint → spatialIndex → scene → image → rayTracer → camera → minilight_multicore`
+
+#### minilight_multicore
+
+- **Source:** sandmark `benchmarks/multicore-minilight/parallel/` (all modules)
+- **Build:** ocamlfind + domainslib (9-module compilation)
+- **Args:** `<scene_file>` — path to a MiniLight scene description (e.g. `roomfront.ml.txt`, bundled)
+- **Description:** Parallel path tracer. Each frame's pixel rows are distributed across domains using `Task.parallel_for` inside `Camera.frame`. Uses `Domain.DLS` for per-domain `Random.State` to avoid contention. Renders progressively, printing progress to stderr and saving PPM output to `<scene_file>.ppm`. **Note:** the renderer runs until interrupted; for benchmarking, wrap with a timeout or limit iterations in the scene file.
+
+### multicore/graph500par
+
+Parallel Graph500 Kronecker graph generator and BFS kernel. Two executables are built from shared library modules; `gen` must be run first to produce an edge-list data file that `kernel1_run_multicore` then reads.
+
+Compilation order for both executables: `graphTypes → sparseGraph → generate → [gen | kernel1Par → kernel1_run_multicore]`
+
+#### gen
+
+- **Source:** sandmark `benchmarks/graph500par/gen.ml` (+ `generate.ml`, `sparseGraph.ml`, `graphTypes.ml`)
+- **Build:** ocamlfind + domainslib + unix
+- **Args:** `[-scale SCALE] [-edgefactor EDGE_FACTOR] [-ndomains NUM_DOMAINS] OUTPUT_FILE` — defaults `scale=12 edgefactor=16 ndomains=1`
+- **Description:** Kronecker graph generator implementing the Graph500 specification. Generates `2^scale` vertices and `edgefactor * 2^scale` edges using a probabilistic bit-setting algorithm with random permutations. Edge generation uses `Task.parallel_for`. Writes the edge list to `OUTPUT_FILE` via `Marshal`.
+
+#### kernel1_run_multicore
+
+- **Source:** sandmark `benchmarks/graph500par/kernel1_run_multicore.ml` (+ `kernel1Par.ml`, `generate.ml`, `sparseGraph.ml`, `graphTypes.ml`)
+- **Build:** ocamlfind + domainslib + unix
+- **Args:** `[-ndomains NUM_DOMAINS] EDGE_LIST_FILE`
+- **Description:** Graph500 Kernel 1 — parallel construction of a sparse adjacency-list representation. Reads the pre-generated edge list from `EDGE_LIST_FILE`, removes self-loops, finds the maximum vertex label using `Task.parallel_for_reduce`, and builds the sparse graph using `Task.parallel_for` with lock-free `Atomic.t`-based adjacency lists. Reports I/O and construction time.
+
 ---
 
 ## TODO — Benchmarks Not Yet Added
@@ -391,12 +604,17 @@ These benchmarks were not added because their dependencies are complex or unusua
 These benchmarks require `domainslib`, multiple domains, or OCaml 5 effect handlers, and are not meaningful on OCaml 4.x.
 
 - **`multicore-effects` (partial)** — `algorithmic_differentiation`, `rec_eff_fib`, `rec_seq_fib`, `rec_eff_tak`, `rec_seq_tak`, `rec_eff_ack`, `rec_seq_ack` are in `multicore/multicore-effects/`. Remaining: `queens` requires multi-shot continuations (`Obj.clone_continuation` / `Effect.Deep.clone_continuation`), which were removed in OCaml 5.2 and have no stdlib replacement yet; `eratosthenes` and `test_sched` require the external `lockfree` package.
-- **`multicore-gcroots`** — Tests concurrent GC root registration across domains.
-- **`multicore-grammatrix`** — Matrix operations with parallel domains.
-- **`multicore-minilight`** — Parallel raytracer variant.
-- **`multicore-numerical`** — Parallel versions of numerical benchmarks.
-- **`multicore-structures`** — Lock-free data structures (`ms_queue`, `treiber_stack`, etc.); requires `domainslib` / `kcas`.
-- **`graph500par`** — Parallel BFS on a Kronecker graph; requires multicore.
+- **`multicore-grammatrix`** — Added to `multicore/multicore-grammatrix/`.
+- **`multicore-minilight`** — Added to `multicore/multicore-minilight/`.
+- **`multicore-numerical`** — Added to `multicore/multicore-numerical/`.
+- **`multicore-structures`** — Added to `multicore/multicore-structures/`; uses OCaml 5 stdlib `Atomic` (no `kcas` required).
+- **`graph500par`** — Added to `multicore/graph500par/`.
+
+### Need C stubs or mixed OCaml/C build
+
+These benchmarks require compiling C foreign stubs alongside OCaml code, which is not yet supported by the simple `ocamlopt` build scripts used here. They may be revisited once a mixed-language build strategy is in place.
+
+- **`multicore-gcroots`** — Tests concurrent GC root registration across domains. The sandmark version wraps internal OCaml GC C APIs (`caml_register_generational_global_root`, etc.) via a C stub library (`globrootsprim`). A pure-OCaml rewrite using `Gc.minor()`/`Gc.full_major()` across domains could approximate the intent, but would not be the same benchmark.
 
 ### Need external tool binaries or large external data
 
