@@ -24,6 +24,7 @@ _build-running/
 *-ocaml-*
 markbench-runtime
 binarytrees.opt
+infer/openssl-capture/
 
 # Generic temporary/editor files
 *~

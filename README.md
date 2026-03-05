@@ -334,6 +334,44 @@ Both in `benches/with_packages/thread-lwt/`; shared dune file.
 - **Args:** `-c <json-file>` — compact-print a JSON file; config uses the bundled `sample.json` (absolute path required since run cwd is a temp dir)
 - **Description:** Parses and pretty-prints a JSON document using the Yojson library. Exercises OCaml's `Buffer`-based output, recursive tree traversal, and moderate allocation from parsing.
 
+## multicore benchmarks
+
+Benchmarks that require OCaml 5.x and the `Effect` module. Source is in `multicore/`; the flat layout mirrors `simple/` (each benchmark in its own subfolder, with an optional `build.deps.sh` for generated data).
+
+Use `OCamlMulticoreBenchmarkSuite` (instead of `OCamlBenchmarkSuite`) in running-ng configs. This suite type enforces OCaml >= 5 at build/run time and raises a clear error if you attempt to sweep with an older compiler.
+
+### multicore/multicore-effects
+
+Single-file effect benchmarks compiled with `ocamlopt`. Adapted from sandmark `benchmarks/multicore-effects/` for the OCaml 5.2+ `Effect` module API (sandmark's originals use the pre-5.2 `effect` keyword syntax, which is not accepted by OCaml 5.2+).
+
+#### algorithmic_differentiation
+
+- **Source:** sandmark `benchmarks/multicore-effects/algorithmic_differentiation.ml` (adapted)
+- **Build:** ocamlopt (stdlib only)
+- **Args:** `<iterations>` — default 100
+- **Description:** Reverse-mode automatic differentiation using deep effect handlers (`Add` and `Mult` effects). Exercises deep effect handler dispatch, continuation resumption, and float array allocation.
+
+#### rec_eff_fib / rec_seq_fib
+
+- **Source:** sandmark `benchmarks/multicore-effects/rec_eff_{fib,seq_fib}.ml` (adapted)
+- **Build:** ocamlopt (stdlib only)
+- **Args:** `<iters> <n>` — default `4 40` (expected output per iter: 102334155)
+- **Description:** Recursive Fibonacci. `rec_eff_fib` installs a `try_with` effect handler at each recursive call site (handler is never triggered; effect `E` is never performed) — tests the overhead of handler installation compared to the pure-recursive `rec_seq_fib` baseline.
+
+#### rec_eff_tak / rec_seq_tak
+
+- **Source:** sandmark `benchmarks/multicore-effects/rec_eff_{tak,seq_tak}.ml` (adapted)
+- **Build:** ocamlopt (stdlib only)
+- **Args:** `<iters> <x> <y> <z>` — default `1 40 20 11` (expected output per iter: 12)
+- **Description:** Takeuchi function. Same handler-overhead comparison pattern as rec_{eff,seq}_fib; three handler installations per recursive call.
+
+#### rec_eff_ack / rec_seq_ack
+
+- **Source:** sandmark `benchmarks/multicore-effects/rec_eff_{ack,seq_ack}.ml` (adapted)
+- **Build:** ocamlopt (stdlib only)
+- **Args:** `<iters> <m> <n>` — default `2 3 11` (expected output per iter: 16381)
+- **Description:** Ackermann function. Same pattern; tests effect handler overhead on a deeply recursive, stack-intensive computation.
+
 ---
 
 ## TODO — Benchmarks Not Yet Added
@@ -352,7 +390,7 @@ These benchmarks were not added because their dependencies are complex or unusua
 
 These benchmarks require `domainslib`, multiple domains, or OCaml 5 effect handlers, and are not meaningful on OCaml 4.x.
 
-- **`multicore-effects`** — Uses OCaml 5 effect handlers (`algorithmic_differentiation`, `eratosthenes`, `queens`, etc.).
+- **`multicore-effects` (partial)** — `algorithmic_differentiation`, `rec_eff_fib`, `rec_seq_fib`, `rec_eff_tak`, `rec_seq_tak`, `rec_eff_ack`, `rec_seq_ack` are in `multicore/multicore-effects/`. Remaining: `queens` requires multi-shot continuations (`Obj.clone_continuation` / `Effect.Deep.clone_continuation`), which were removed in OCaml 5.2 and have no stdlib replacement yet; `eratosthenes` and `test_sched` require the external `lockfree` package.
 - **`multicore-gcroots`** — Tests concurrent GC root registration across domains.
 - **`multicore-grammatrix`** — Matrix operations with parallel domains.
 - **`multicore-minilight`** — Parallel raytracer variant.
