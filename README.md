@@ -553,7 +553,7 @@ Multicore GC stress test using OxCaml-specific APIs. **Requires an OxCaml compil
 - **Args:** _(none)_
 - **Description:** Spawns 8 domains using `Domain.Safe.spawn` (OxCaml API), each building a large binary tree of depth 28 with 10-byte string leaves. After all domains have built their trees, the main domain runs 10 `Gc.full_major` cycles. Exercises concurrent major GC marking across multiple domains with a large shared live set. Uses `Sys.poll_actions` for cooperative domain coordination and `Atomic` for synchronisation.
 - **OxCaml APIs used:** `Domain.Safe.spawn`, `Sys.poll_actions`
-- **Suite type:** `OCamlOxcamlBenchmarkSuite` — prints a warning at build time if run with a non-OxCaml runtime.
+- **Suite type:** `OCamlOxcamlBenchmarkSuite` — fails with an error if the runtime is not `type: OxCaml`.
 
 ### multicore/multicore-minilight
 
