@@ -245,29 +245,21 @@ Six benchmarks sharing `benches/numerical-analysis/`. Each has its own build scr
 
 ## with_packages benchmarks
 
-Benchmarks in `with_packages/` require external opam packages.
+Benchmarks in `with_packages/` require external opam packages. **No manual package installation is needed** — each build script auto-installs the required packages via `_opam_auto_install()`.
 
-### Setup: opam-managed compilers
+### How auto-install works
 
-For compilers installed via opam (e.g. `ocaml-v5.4`, `ocaml-v4.14.3`), the build scripts auto-install the required packages into the correct switch on first use — no manual setup needed.
+Each `<benchmark>.build.sh` in `with_packages/` contains a `_opam_auto_install()` function that:
 
-### Setup: custom / dev compilers
+1. **opam-managed compiler** (lives under `~/.opam/<switch>/bin/ocaml`): installs packages directly into that switch.
+2. **External/custom compiler** (built from source): derives a stable switch name from the compiler path + version hash, creates a per-version opam switch with a minimal local repo (so any version string — release or dev — is accepted), and installs packages there.
+3. **Explicit override**: if `OPAM_SWITCH` is set (via `build_env` in the YAML config), uses that switch directly.
 
-For a compiler built from source (e.g. `ocaml-release` pointing to a commit), `ocaml-system` in the opam repository only exists for published release versions. If your build's `ocaml -vnum` returns a non-release string (e.g. `5.4.1+dev`), you need to create the opam switch manually once:
+The auto-created switches and installed packages are cached and reused across runs.
 
-```bash
-# Set PATH to the custom compiler
-export PATH="/path/to/custom/ocaml/bin:$PATH"
+### Overriding the opam switch
 
-# For a clean release version (ocaml -vnum = "5.4.1"):
-opam switch create my-custom-switch --packages ocaml-system --no-switch
-
-# For a dev/trunk version, pin ocaml-system to the clean version number:
-VNUM=$(ocaml -vnum | grep -oP '^\d+\.\d+\.\d+')
-opam switch create my-custom-switch --packages "ocaml-system.${VNUM}" --no-switch
-```
-
-Then tell the build scripts which switch to use by adding `build_env` to the suite in the YAML:
+To force a specific switch, add `build_env` to the suite in the YAML config:
 
 ```yaml
 sandmark-with-packages:
@@ -278,9 +270,7 @@ sandmark-with-packages:
     fasta3: ...
 ```
 
-`OPAM_SWITCH` takes precedence over all auto-detection; the build scripts install the required packages into that switch and use it for all dune builds.
-
-The `sandmark-with-packages` suite in the YAML config is commented out by default; uncomment it once the packages are available in the target switch.
+`OPAM_SWITCH` takes precedence over all auto-detection.
 
 ### benchmarksgame
 
@@ -551,6 +541,19 @@ A shared helper module `utls.ml` is compiled alongside the main benchmark in eac
 - **Build:** ocamlfind + domainslib + unix
 - **Args:** `<num_domains> <chunk_size> <input_file>` — default `4 16 data/tox21_nrar_ligands_std_rand_01.csv`
 - **Description:** Parallel Gram matrix computation using explicit `Domainslib.Chan`-based task distribution. Work chunks of `<chunk_size>` rows are sent through a bounded channel; each domain fetches and processes chunks until a `Quit` message is received. Channel-based dispatch is preferred over `parallel_for` here because earlier rows have more work (triangular iteration), so pre-computing and queuing chunks in decreasing-work order improves load balance. **Note:** the benchmark must be run from the `multicore-grammatrix/` directory so that the `data/` relative path resolves correctly.
+
+### multicore/oxcaml-prefetch (OxCaml only)
+
+Multicore GC stress test using OxCaml-specific APIs. **Requires an OxCaml compiler** (Jane Street's OCaml fork) — will not compile with stock OCaml.
+
+#### oxcaml_prefetch
+
+- **Source:** custom benchmark (not from sandmark)
+- **Build:** ocamlopt (stdlib only)
+- **Args:** _(none)_
+- **Description:** Spawns 8 domains using `Domain.Safe.spawn` (OxCaml API), each building a large binary tree of depth 28 with 10-byte string leaves. After all domains have built their trees, the main domain runs 10 `Gc.full_major` cycles. Exercises concurrent major GC marking across multiple domains with a large shared live set. Uses `Sys.poll_actions` for cooperative domain coordination and `Atomic` for synchronisation.
+- **OxCaml APIs used:** `Domain.Safe.spawn`, `Sys.poll_actions`
+- **Suite type:** `OCamlOxcamlBenchmarkSuite` — prints a warning at build time if run with a non-OxCaml runtime.
 
 ### multicore/multicore-minilight
 
