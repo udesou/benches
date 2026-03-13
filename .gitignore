@@ -22,6 +22,7 @@ _build-running/
 *-ocaml-local
 *-ocaml-global
 *-ocaml-*
+*-oxcaml-*
 markbench-runtime
 binarytrees.opt
 infer/openssl-capture/

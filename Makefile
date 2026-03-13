@@ -18,7 +18,8 @@ clean: clean-dune clean-with-deps
 			-name "*.cmti" -o \
 			-name "*.annot" -o \
 			-name "*.opt" -o \
-			-name "*-ocaml-*" \
+			-name "*-ocaml-*" -o \
+			-name "*-oxcaml-*" \
 		\) -delete
 
 clean-dune:

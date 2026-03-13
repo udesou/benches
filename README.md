@@ -91,6 +91,22 @@ chmod +x "$OUT"
 
 ---
 
+## Cleaning Build Artifacts
+
+```bash
+cd ~/benches && make clean
+```
+
+The `Makefile` provides three targets:
+
+- **`clean`** — runs both `clean-dune` and `clean-with-deps`, then removes compiled objects (`.o`, `.a`, `.so`, `.cmi`, `.cmx`, `.cmxa`, `.cmo`, `.cma`, `.cmt`, `.cmti`, `.annot`, `.opt`) and tagged benchmark binaries (`*-ocaml-*`, `*-oxcaml-*`).
+- **`clean-dune`** — removes `_build` and `_build-running` directories (dune build caches).
+- **`clean-with-deps`** — removes generated input data (e.g. `graph500seq/edges.data`).
+
+**When to clean:** After changing compiler flags (e.g. adding `--enable-multidomain` to an OxCaml runtime), stale cached binaries may mask the change. Run `make clean` to force a rebuild on the next benchmark run.
+
+---
+
 ## Benchmarks
 
 All benchmarks below are sourced from [sandmark](https://github.com/ocaml-bench/sandmark) unless noted otherwise.
