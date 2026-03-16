@@ -112,6 +112,25 @@ The `Makefile` provides three targets:
 All benchmarks below are sourced from [sandmark](https://github.com/ocaml-bench/sandmark) unless noted otherwise.
 Build approach is either **ocamlopt** (single `.ml` compiled directly) or **dune** (multi-file, uses a `dune` file in the benchmark dir).
 
+### Benchmark Count Summary
+
+Counts are based on the build scripts present in this repo (`~/benches`).
+All programs are registered in `running-ng`'s `ocaml_gc_sweep_example.yml`.
+
+| Directory | Programs | Requires |
+|---|---|---|
+| `simple/` | 18 | stdlib / unix |
+| `with_deps/` | 1 | dune multi-lib or generated data |
+| `with_packages/` | 16 | external opam packages |
+| `multicore/multicore-effects` | 7 | OCaml ≥ 5, effects |
+| `multicore/multicore-structures` | 7 | OCaml ≥ 5, stdlib Atomic |
+| `multicore/multicore-numerical` | 23 | OCaml ≥ 5, domainslib |
+| `multicore/multicore-grammatrix` | 2 | OCaml ≥ 5, domainslib |
+| `multicore/multicore-minilight` | 1 | OCaml ≥ 5, domainslib |
+| `multicore/graph500par` | 1 | OCaml ≥ 5, domainslib |
+| `multicore/oxcaml-prefetch` | 1 | OxCaml compiler fork |
+| **Total** | **77** | |
+
 ### binarytrees
 
 - **Source:** benchmarksgame (via sandmark `benchmarksgame/binarytrees5.ml`, adapted)
