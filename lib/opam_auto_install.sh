@@ -233,6 +233,48 @@ DUNESTUB
             echo "Building csexp + dune-configurator for OxCaml switch..." >&2
             _build_dune_configurator_for_switch "${switch}" "${opam_root}" "${ocaml_bin_dir}"
           fi
+
+        else
+          # --- Stock OCaml ext switch: ensure real ocamlfind ----------------------
+          # OxCaml stubs in ext-compiler-repo may shadow the real ocamlfind.
+          # If the ext switch has no ocamlfind binary (stub was installed instead
+          # of the real package), build it from source — same as for OxCaml.
+          local switch_bin="${opam_root}/${switch}/bin"
+          if [[ ! -x "${switch_bin}/ocamlfind" ]]; then
+            echo "Stock OCaml ext switch missing ocamlfind binary (stub shadowed real package)." >&2
+            echo "Building ocamlfind from source for ext switch '${switch}'..." >&2
+            _build_ocamlfind_for_switch "${switch}" "${opam_root}" "${ocaml_bin_dir}"
+          fi
+
+          # Ensure dune binary is available (stub dune has no binary).
+          if [[ ! -x "${switch_bin}/dune" ]]; then
+            local _sys_dune=""
+            local _try_sw
+            for _try_sw in $("${OPAM}" switch list --short 2>/dev/null); do
+              [[ "${_try_sw}" == ext-* ]] && continue
+              [[ "${_try_sw}" == running-ng-oxcaml-build ]] && continue
+              if [[ -x "${opam_root}/${_try_sw}/bin/dune" ]]; then
+                _sys_dune="${opam_root}/${_try_sw}/bin/dune"
+                break
+              fi
+            done
+            if [[ -z "${_sys_dune}" ]]; then
+              _sys_dune="$(command -v dune 2>/dev/null)" || true
+            fi
+            if [[ -n "${_sys_dune}" && -x "${_sys_dune}" ]]; then
+              mkdir -p "${switch_bin}"
+              ln -sf "${_sys_dune}" "${switch_bin}/dune"
+              echo "Symlinked dune → ${_sys_dune} into ${switch_bin}/" >&2
+            fi
+          fi
+
+          # Build dune-configurator if the stub shadowed the real library.
+          # Packages like bigstringaf, checkseum need it at build time.
+          local switch_lib="${opam_root}/${switch}/lib"
+          if [[ ! -f "${switch_lib}/dune-configurator/configurator.cmxa" ]]; then
+            echo "Building csexp + dune-configurator for stock OCaml ext switch..." >&2
+            _build_dune_configurator_for_switch "${switch}" "${opam_root}" "${ocaml_bin_dir}"
+          fi
         fi
         ;;
     esac
