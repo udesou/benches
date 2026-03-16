@@ -15,7 +15,7 @@ let blit_to_buffer t b v len =
 
 let compress data =
   (* pre-allocation of values. *)
-  let w = De.make_window ~bits:15 in
+  let w = De.Lz77.make_window ~bits:15 in
   let q = De.Queue.create 0x1000 in
   let i = De.bigstring_create De.io_buffer_size in
   let o = De.bigstring_create De.io_buffer_size in
@@ -38,7 +38,7 @@ let compress data =
   let flush v len = blit_to_buffer t b v len in
 
   Higher.compress
-    ~level:3 ~w ~q ~i ~o ~refill ~flush ;
+    ~level:3 ~w ~q ~refill ~flush i o ;
   Buffer.contents b
 
 let uncompress data =
@@ -59,7 +59,9 @@ let uncompress data =
       v ~dst_off:0 ~len ; p := !p + len ; len in
   let flush v len = blit_to_buffer t b v len in
 
-  Higher.uncompress ~allocate ~i ~o ~refill ~flush
+  match Higher.uncompress ~allocate ~refill ~flush i o with
+  | Ok () -> Buffer.contents b
+  | Error (`Msg msg) -> failwith msg
 
 let () = Random.init(42)
 
