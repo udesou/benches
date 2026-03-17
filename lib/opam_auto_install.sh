@@ -80,13 +80,17 @@ _opam_auto_install() {
 
         # Virtual ocaml-system package for this exact version.
         mkdir -p "${localrepo}/packages/ocaml-system/ocaml-system.${vnum}"
-        printf 'opam-version: "2.0"\n' \
+        # Conflict with ocaml-base-compiler to prevent opam from installing
+        # a different compiler version when resolving transitive dependencies.
+        printf 'opam-version: "2.0"\nconflicts: ["ocaml-base-compiler"]\n' \
           > "${localrepo}/packages/ocaml-system/ocaml-system.${vnum}/opam"
 
         # Virtual ocaml meta-package so "ocaml >= X" constraints resolve.
+        # Only allow ocaml-system (not ocaml-base-compiler) to prevent opam
+        # from upgrading the compiler in ext-switches.
         mkdir -p "${localrepo}/packages/ocaml/ocaml.${vnum}"
-        printf 'opam-version: "2.0"\ndepends: [("ocaml-base-compiler" {= "%s"} | "ocaml-system" {= "%s"}) "ocaml-config"]\n' \
-          "${vnum}" "${vnum}" \
+        printf 'opam-version: "2.0"\ndepends: ["ocaml-system" {= "%s"} "ocaml-config"]\n' \
+          "${vnum}" \
           > "${localrepo}/packages/ocaml/ocaml.${vnum}/opam"
 
         # --- OxCaml: stub ocamlfind in local repo -----------------------------
@@ -319,7 +323,14 @@ DUNESTUB
 
   if [[ -n "${install_pkgs}" ]]; then
     echo "Auto-installing [${install_pkgs}] into opam switch '${switch}'..." >&2
-    "${OPAM}" install --switch "${switch}" --yes ${install_pkgs} >&2
+    # For ext-switches, add an explicit "ocaml.${vnum}" constraint to prevent
+    # opam from upgrading the compiler via the default repo when resolving
+    # transitive dependencies (e.g. domainslib -> saturn -> ocaml >= 5.2).
+    if [[ "${switch}" == ext-* && -n "${vnum}" ]]; then
+      "${OPAM}" install --switch "${switch}" --yes ${install_pkgs} "ocaml.${vnum}" >&2
+    else
+      "${OPAM}" install --switch "${switch}" --yes ${install_pkgs} >&2
+    fi
   fi
 
   # For stock OCaml, install ocamlfind normally if it was in the package list.
@@ -328,7 +339,11 @@ DUNESTUB
       if [[ "${p}" == "ocamlfind" ]]; then
         if ! "${OPAM}" list --switch "${switch}" --installed --short ocamlfind 2>/dev/null | grep -q ocamlfind; then
           echo "Auto-installing [ocamlfind] into opam switch '${switch}'..." >&2
-          "${OPAM}" install --switch "${switch}" --yes ocamlfind >&2
+          if [[ "${switch}" == ext-* && -n "${vnum}" ]]; then
+            "${OPAM}" install --switch "${switch}" --yes ocamlfind "ocaml.${vnum}" >&2
+          else
+            "${OPAM}" install --switch "${switch}" --yes ocamlfind >&2
+          fi
         fi
         break
       fi
@@ -575,7 +590,7 @@ _build_num_for_switch() {
   tmpdir="$(mktemp -d)"
   trap "rm -rf '${tmpdir}'" RETURN
 
-  local version="1.5"
+  local version="1.6"
   local url="https://github.com/ocaml/num/archive/refs/tags/v${version}.tar.gz"
 
   local dl_cmd=""
