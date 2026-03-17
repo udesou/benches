@@ -234,6 +234,14 @@ DUNESTUB
             _build_dune_configurator_for_switch "${switch}" "${opam_root}" "${ocaml_bin_dir}"
           fi
 
+          # Build num library from source if requested and not yet installed.
+          # num uses Makefiles (not dune) for its opam build, which fail in
+          # ext-switch sandboxes because the compiler isn't on PATH.
+          if [[ " ${pkgs} " == *" num "* ]] && [[ ! -f "${switch_lib}/num/META" ]]; then
+            echo "Building num for OxCaml switch..." >&2
+            _build_num_for_switch "${switch}" "${opam_root}" "${ocaml_bin_dir}"
+          fi
+
         else
           # --- Stock OCaml ext switch: ensure real ocamlfind ----------------------
           # OxCaml stubs in ext-compiler-repo may shadow the real ocamlfind.
@@ -275,6 +283,12 @@ DUNESTUB
             echo "Building csexp + dune-configurator for stock OCaml ext switch..." >&2
             _build_dune_configurator_for_switch "${switch}" "${opam_root}" "${ocaml_bin_dir}"
           fi
+
+          # Build num library from source if requested and not yet installed.
+          if [[ " ${pkgs} " == *" num "* ]] && [[ ! -f "${switch_lib}/num/META" ]]; then
+            echo "Building num for stock OCaml ext switch..." >&2
+            _build_num_for_switch "${switch}" "${opam_root}" "${ocaml_bin_dir}"
+          fi
         fi
         ;;
     esac
@@ -291,6 +305,13 @@ DUNESTUB
     if [[ "${vnum}" == *"+ox"* ]]; then
       case "${p}" in
         ocamlfind|dune|dune-configurator|dune-private-libs|dune-secondary|csexp) continue ;;
+      esac
+    fi
+    # For ext-switches, skip num — built from source above (num's Makefile
+    # build fails in opam's sandbox because the ext compiler isn't on PATH).
+    if [[ "${switch}" == ext-* ]]; then
+      case "${p}" in
+        num) continue ;;
       esac
     fi
     install_pkgs="${install_pkgs:+${install_pkgs} }${p}"
@@ -526,4 +547,85 @@ DUNEMETA
   fi
 
   echo "  dune-configurator installed into ${switch_lib}/dune-configurator/" >&2
+}
+
+# Build the num library from source and install it into the given opam switch.
+# num's opam package uses Makefiles (not dune) which invoke bare ocamlc/ocamlopt.
+# In ext-switches, opam's build sandbox doesn't have the external compiler on
+# PATH, so the build silently produces no artifacts.  We build with dune instead,
+# which correctly finds the compiler via the switch configuration.
+_build_num_for_switch() {
+  local switch="$1"
+  local opam_root="$2"
+  local compiler_bin_dir="$3"
+  local switch_prefix="${opam_root}/${switch}"
+  local switch_lib="${switch_prefix}/lib"
+
+  # We need a dune binary to build num.
+  local dune_bin="${switch_prefix}/bin/dune"
+  if [[ ! -x "${dune_bin}" ]]; then
+    dune_bin="$(command -v dune 2>/dev/null)" || true
+  fi
+  if [[ -z "${dune_bin}" || ! -x "${dune_bin}" ]]; then
+    echo "WARNING: No dune binary available. Cannot build num." >&2
+    return 0
+  fi
+
+  local tmpdir
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf '${tmpdir}'" RETURN
+
+  local version="1.5"
+  local url="https://github.com/ocaml/num/archive/refs/tags/v${version}.tar.gz"
+
+  local dl_cmd=""
+  if command -v curl >/dev/null 2>&1; then
+    dl_cmd="curl -sSL"
+  elif command -v wget >/dev/null 2>&1; then
+    dl_cmd="wget -qO-"
+  else
+    echo "WARNING: Neither curl nor wget found. Cannot download num." >&2
+    return 0
+  fi
+
+  echo "  Downloading num ${version}..." >&2
+  ${dl_cmd} "${url}" | tar xz -C "${tmpdir}"
+
+  local srcdir="${tmpdir}/num-${version}"
+  if [[ ! -d "${srcdir}" ]]; then
+    echo "WARNING: num source not found after extraction." >&2
+    return 0
+  fi
+
+  echo "  Building num with target compiler..." >&2
+  (
+    cd "${srcdir}"
+    PATH="${compiler_bin_dir}:$(dirname "${dune_bin}"):${PATH}" \
+    OCAMLPATH="${switch_lib}" \
+      "${dune_bin}" build -p num 2>&1
+  ) >&2
+
+  # Install num into ext switch lib directory.
+  # num has subdirectories (core/, top/) so we need recursive copy.
+  local install_base="${srcdir}/_build/install/default/lib"
+  if [[ ! -d "${install_base}/num" ]]; then
+    echo "WARNING: num build produced no install files." >&2
+    return 0
+  fi
+  # Use -rL to dereference symlinks (dune install tree uses symlinks
+  # back into _build/ which won't survive tmpdir cleanup).
+  cp -rL "${install_base}/num" "${switch_lib}/"
+
+  # Install num_top if present (toplevel support).
+  if [[ -d "${install_base}/num_top" ]]; then
+    cp -rL "${install_base}/num_top" "${switch_lib}/"
+  fi
+
+  # Install stublibs (C stubs for num's native code).
+  if [[ -d "${install_base}/stublibs" ]]; then
+    mkdir -p "${switch_lib}/stublibs"
+    cp -L "${install_base}/stublibs"/* "${switch_lib}/stublibs/" 2>/dev/null || true
+  fi
+
+  echo "  num installed into ${switch_lib}/num/" >&2
 }
