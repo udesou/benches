@@ -1,0 +1,4 @@
+(executable
+ (name contrast)
+ (modules contrast)
+ (libraries camlimages.all_formats unix))

@@ -1,0 +1,3 @@
+(executable
+ (name test_lwt)
+ (libraries uuidm ocplib-endian unix react lwt lwt.unix))

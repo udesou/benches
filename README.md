@@ -121,7 +121,7 @@ All programs are registered in `running-ng`'s `ocaml_gc_sweep_example.yml`.
 |---|---|---|
 | `simple/` | 38 | stdlib / unix |
 | `with_deps/` | 10 | dune multi-lib or generated data |
-| `with_packages/` | 17 | external opam packages |
+| `with_packages/` | 20 | external opam packages |
 | `multicore/multicore-effects` | 11 | OCaml ≥ 5, effects |
 | `multicore/multicore-structures` | 7 | OCaml ≥ 5, stdlib Atomic |
 | `multicore/multicore-numerical` | 23 | OCaml ≥ 5, domainslib |
@@ -131,7 +131,7 @@ All programs are registered in `running-ng`'s `ocaml_gc_sweep_example.yml`.
 | `multicore/pingpong_multicore` | 1 | OCaml ≥ 5, domainslib |
 | `multicore/graph500par` | 1 | OCaml ≥ 5, domainslib |
 | `multicore/oxcaml-prefetch` | 1 | OxCaml compiler fork |
-| **Total** | **113** | |
+| **Total** | **116** | |
 
 ### markbench
 
@@ -572,6 +572,28 @@ Both in `benches/with_packages/thread-lwt/`; shared dune file.
 - **Args:** `<num_domains> <tasks_to_spawn> <list_length>`
 - **Description:** Microbenchmark for a concurrent round-robin effects-based scheduler (`ms_sched.ml`). Spawns `<tasks_to_spawn>` tasks per run, each allocating a list of length `<list_length>`. The scheduler uses a Saturn Michael–Scott queue as its run queue and `Domain.spawn` to run workers across `<num_domains>` domains. Exercises effect handler dispatch, continuation enqueuing, and domain coordination.
 - **Note:** In `with_packages/` (not `multicore/`) because it depends on `saturn_lockfree`. See `SANDMARK_ADAPTATIONS.md` for the porting changes from the sandmark original.
+
+### test_lwt (valet)
+
+- **Source:** sandmark `benchmarks/valet/` (4 files: `valet_core.ml`, `valet_react.ml`, `test_lib.ml`, `test_lwt.ml`)
+- **Build:** dune + `uuidm`, `ocplib-endian`, `react`, `lwt`
+- **Args:** `<n>` — number of users/readers/doors; each of n persons swipes n times → O(n²) events
+- **Description:** Reactive access-control simulation. n people each hold a UUID-backed QR code; n QR readers feed into a controller (via `react` event streams) that maps codes to users, which doors then act on. All persons run concurrently via `Lwt.join` with `Lwt.pause ()` yields between each swipe. Exercises Lwt cooperative scheduling, `react` event propagation, and UUID/map allocation.
+- **OxCaml:** incompatible (lwt.unix locality error, same as `chameneos_redux_lwt`)
+
+### contrast
+
+- **Source:** sandmark `benchmarks/sauvola/contrast.ml`
+- **Build:** dune + `camlimages` (`camlimages.all_formats` sub-library)
+- **Args:** `<input.ppm> <output_prefix>` — config uses the bundled `example2_small.ppm` (absolute path); output goes to `/tmp/sauvola_out__*.ppm`
+- **Description:** Applies 8 image binarisation algorithms (adaptive contrast spreading, Niblack global/local, Sauvola global/local) to a PPM image. Each algorithm creates a new `rgb24` image and iterates over all pixels, exercising OO-style image allocation and GC-heavy pixel-by-pixel access patterns.
+
+### owl_gc
+
+- **Source:** sandmark `benchmarks/owl/owl_gc.ml`
+- **Build:** dune + `owl-base` (pure OCaml; no CBLAS/LAPACK required)
+- **Args:** _(none)_
+- **Description:** Computes a Gromov-Wasserstein distance matrix over 100 random 100×100 distance matrices using Owl's dense matrix operations (`Bigarray`-backed). Exercises large `Bigarray` allocation and GC interaction with non-moving arrays. Uses `owl-base` instead of `owl` to avoid CBLAS/LAPACK build requirements.
 
 ## multicore benchmarks
 
