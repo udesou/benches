@@ -55,9 +55,9 @@ Conventions used by default:
 - build script: `<benchmark-name>.build.sh`
 - output binary: `<benchmark-name>-<runtime-name>`
 
-So benchmark `binarytrees` with runtime `ocaml-local` produces:
+So benchmark `almabench` with runtime `ocaml-local` produces:
 
-- `simple/binarytrees/binarytrees-ocaml-local`
+- `simple/almabench/almabench-ocaml-local`
 
 You can override this in `running-ng` config with `build_script` and `binary`, but the convention above means those fields are usually unnecessary.
 
@@ -81,11 +81,11 @@ set -euo pipefail
 
 : "${OCAML_EXECUTABLE:?OCAML_EXECUTABLE is required}"
 OUT="${RUNNING_OCAML_OUTPUT:?RUNNING_OCAML_OUTPUT is required}"
-SRC="${RUNNING_OCAML_BENCH_DIR}/binarytrees.ml"
+SRC="${RUNNING_OCAML_BENCH_DIR}/almabench.ml"
 OCAMLOPT="$(dirname "$OCAML_EXECUTABLE")/ocamlopt"
 
 mkdir -p "$(dirname "$OUT")"
-"$OCAMLOPT" -O3 -I +unix unix.cmxa "$SRC" -o "$OUT"
+"$OCAMLOPT" -O3 "$SRC" -o "$OUT"
 chmod +x "$OUT"
 ```
 
@@ -119,24 +119,19 @@ All programs are registered in `running-ng`'s `ocaml_gc_sweep_example.yml`.
 
 | Directory | Programs | Requires |
 |---|---|---|
-| `simple/` | 18 | stdlib / unix |
-| `with_deps/` | 1 | dune multi-lib or generated data |
-| `with_packages/` | 16 | external opam packages |
-| `multicore/multicore-effects` | 7 | OCaml ≥ 5, effects |
+| `simple/` | 38 | stdlib / unix |
+| `with_deps/` | 10 | dune multi-lib or generated data |
+| `with_packages/` | 17 | external opam packages |
+| `multicore/multicore-effects` | 11 | OCaml ≥ 5, effects |
 | `multicore/multicore-structures` | 7 | OCaml ≥ 5, stdlib Atomic |
 | `multicore/multicore-numerical` | 23 | OCaml ≥ 5, domainslib |
 | `multicore/multicore-grammatrix` | 2 | OCaml ≥ 5, domainslib |
 | `multicore/multicore-minilight` | 1 | OCaml ≥ 5, domainslib |
+| `multicore/alloc_multicore` | 1 | OCaml ≥ 5, stdlib Domain |
+| `multicore/pingpong_multicore` | 1 | OCaml ≥ 5, domainslib |
 | `multicore/graph500par` | 1 | OCaml ≥ 5, domainslib |
 | `multicore/oxcaml-prefetch` | 1 | OxCaml compiler fork |
-| **Total** | **77** | |
-
-### binarytrees
-
-- **Source:** benchmarksgame (via sandmark `benchmarksgame/binarytrees5.ml`, adapted)
-- **Build:** ocamlopt + `unix.cmxa`
-- **Args:** `<depth>` — tree depth; config uses `21`
-- **Description:** Allocates and traverses binary trees of increasing depth. Classic GC stress test; the vast majority of allocation is short-lived.
+| **Total** | **113** | |
 
 ### markbench
 
@@ -144,6 +139,14 @@ All programs are registered in `running-ng`'s `ocaml_gc_sweep_example.yml`.
 - **Build:** dune + `unix`
 - **Args:** _(none)_ — defaults to 10 `Gc.full_major` cycles; pass an integer to override
 - **Description:** Microbenchmark for the major GC mark phase. Allocates a large live set and calls `Gc.full_major` repeatedly, measuring seconds per GC cycle. Sensitive to `o` (space overhead) and `s` (minor heap size).
+
+### minilight
+
+- **Source:** sandmark `benchmarks/multicore-minilight/sequential/`
+- **Build:** dune (stdlib only, multi-file), in `simple/minilight/`
+- **Args:** `<scene-file>` — absolute path to `roomfront.ml.txt`; use `/home/udesou/benches/simple/minilight/roomfront.ml.txt`
+- **Description:** Sequential MiniLight 1.5.2 global illumination renderer. Traces rays through a Cornell box scene using an octree spatial index; exercises float arithmetic, object-oriented style (classes), and moderate allocation. The sandmark dune listed `domainslib` but the sequential sources do not use it.
+- **Note:** The parallel version is `multicore/multicore-minilight/minilight_multicore`.
 
 ### almabench
 
@@ -264,6 +267,140 @@ Six benchmarks sharing `benches/numerical-analysis/`. Each has its own build scr
 
 ---
 
+## simple/stdlib benchmarks
+
+Sandmark's `benchmarks/stdlib/` suite: 10 single-file benchmarks covering core stdlib
+data structures. Each takes `<bench_type> [args]` and dispatches to sub-benchmarks.
+
+### array_bench
+- **Source:** sandmark `benchmarks/stdlib/array_bench.ml`
+- **Build:** ocamlopt (stdlib only)
+- **Args:** `<bench_type>` — e.g. `make`, `init`, `map`, etc.
+- **Description:** Array allocation, initialisation, map, sort, and iteration microbenchmarks.
+
+### bytes_bench
+- **Source:** sandmark `benchmarks/stdlib/bytes_bench.ml`
+- **Build:** ocamlopt (stdlib only)
+- **Args:** `<bench_type>`
+- **Description:** Bytes buffer operations: blit, fill, sub, compare.
+
+### string_bench
+- **Source:** sandmark `benchmarks/stdlib/string_bench.ml`
+- **Build:** ocamlopt (stdlib only)
+- **Args:** `<bench_type>`
+- **Description:** String operations: concat, contains, split, compare.
+
+### map_bench
+- **Source:** sandmark `benchmarks/stdlib/map_bench.ml`
+- **Build:** ocamlopt (stdlib only)
+- **Args:** `<bench_type>`
+- **Description:** Functional map (AVL tree) insert, lookup, fold, merge.
+
+### set_bench
+- **Source:** sandmark `benchmarks/stdlib/set_bench.ml`
+- **Build:** ocamlopt (stdlib only)
+- **Args:** `<bench_type>`
+- **Description:** Functional set insert, union, inter, diff.
+
+### stack_bench
+- **Source:** sandmark `benchmarks/stdlib/stack_bench.ml`
+- **Build:** ocamlopt (stdlib only)
+- **Args:** `<bench_type>`
+- **Description:** Stack push/pop operations.
+
+### hashtbl_bench
+- **Source:** sandmark `benchmarks/stdlib/hashtbl_bench.ml`
+- **Build:** ocamlopt (stdlib only)
+- **Args:** `<bench_type>`
+- **Description:** Hashtable add, find, replace, fold.
+
+### pervasives_bench
+- **Source:** sandmark `benchmarks/stdlib/pervasives_bench.ml`
+- **Build:** ocamlopt (stdlib only)
+- **Args:** `<bench_type>`
+- **Description:** Stdlib arithmetic and comparison functions.
+
+### str_bench
+- **Source:** sandmark `benchmarks/stdlib/str_bench.ml`
+- **Build:** ocamlopt + `str.cmxa` (`-I +str str.cmxa`)
+- **Args:** `<bench_type>`
+- **Description:** Regular expression operations from the `Str` library.
+
+### big_array_bench
+- **Source:** sandmark `benchmarks/stdlib/big_array_bench.ml`
+- **Build:** ocamlopt; links `bigarray.cmxa` only on OCaml 4.x (bundled into stdlib on 5.x)
+- **Args:** `<bench_type>`
+- **Description:** Bigarray allocation and element access patterns.
+
+---
+
+## simple/simple-tests benchmarks
+
+Sandmark's `benchmarks/simple-tests/` suite: small stdlib-only benchmarks covering
+allocation, lazy evaluation, stacks, finalizers, and weak/ephemeron tables.
+
+### alloc
+- **Source:** sandmark `benchmarks/simple-tests/alloc.ml`
+- **Build:** ocamlopt (stdlib only)
+- **Args:** none
+- **Description:** Minor heap allocation rate benchmark: allocates tuples and small lists at high frequency.
+
+### lists
+- **Source:** sandmark `benchmarks/simple-tests/lists.ml`
+- **Build:** ocamlopt (stdlib only)
+- **Args:** none
+- **Description:** List operations: append, rev, map, filter, fold.
+
+### stress
+- **Source:** sandmark `benchmarks/simple-tests/stress.ml`
+- **Build:** ocamlopt (stdlib only)
+- **Args:** none
+- **Description:** Allocation stress test; exercises minor and major GC.
+
+### lazylist
+- **Source:** sandmark `benchmarks/simple-tests/lazylist.ml`
+- **Build:** ocamlopt (stdlib only)
+- **Args:** none
+- **Description:** Lazy list operations via `Lazy.t` suspension.
+
+### lazy_primes
+- **Source:** sandmark `benchmarks/simple-tests/lazy_primes.ml`
+- **Build:** ocamlopt (stdlib only)
+- **Args:** none
+- **Description:** Lazy sieve of Eratosthenes using `Lazy.t`-deferred streams.
+
+### morestacks
+- **Source:** sandmark `benchmarks/simple-tests/morestacks.ml`
+- **Build:** ocamlopt (stdlib only)
+- **Args:** none
+- **Description:** Stack operations on functional and imperative stacks.
+
+### stacks
+- **Source:** sandmark `benchmarks/simple-tests/stacks.ml`
+- **Build:** ocamlopt (stdlib only)
+- **Args:** none
+- **Description:** Stdlib `Stack` module push/pop under various patterns.
+
+### finalise
+- **Source:** sandmark `benchmarks/simple-tests/finalise.ml`
+- **Build:** ocamlopt (stdlib only)
+- **Args:** none
+- **Description:** GC finalizer registration and invocation throughput (`Gc.finalise`).
+
+### weakretain
+- **Source:** sandmark `benchmarks/simple-tests/weakretain.ml`
+- **Build:** ocamlopt (stdlib only)
+- **Args:** none
+- **Description:** Weak pointer retention: allocates objects and checks how many survive GC through a `Weak.t` array.
+
+### weak_htbl
+- **Source:** sandmark `benchmarks/simple-tests/weak_htbl.ml`
+- **Build:** ocamlopt (stdlib only); OCaml 5.x adaptation (see `SANDMARK_ADAPTATIONS.md`)
+- **Args:** `<N>` — table size
+- **Description:** Correctness and performance test for ephemeron-based hash tables (`Ephemeron.K{1,2,n}.Make`) versus regular `Hashtbl` and `Map`-backed tables. Note: `iter` was removed from Ephemeron modules in OCaml 5.x; the correctness assertions for weak tables now pass vacuously.
+
+---
+
 ## with_deps benchmarks
 
 ### graph500seq
@@ -275,6 +412,75 @@ Six benchmarks sharing `benches/numerical-analysis/`. Each has its own build scr
 - **graphTypes:** In sandmark, `GraphTypes` is provided by a parent dune-project scope. Here it is defined explicitly in `graphTypes.ml` (`type vertex = int`, `type weight = float`, `type edge = vertex * vertex * weight`).
 - **Data generation:** `graph500seq.build.deps.sh` builds `gen.exe` with dune and runs it (`-scale 21 -edgefactor 16`) to produce `edges.data` (~64M edges). This is done once and reused across all runtime versions since the data is OCaml-version-independent.
 - **Timeout:** 300 s (longer than simple benchmarks due to data loading + graph construction).
+
+### knucleotide
+
+- **Source:** sandmark `benchmarks/benchmarksgame/knucleotide.ml`
+- **Build:** dune (stdlib only), in `with_deps/benchmarksgame/`
+- **Args:** `<input-file>` — absolute path to `input25000000.txt`; generated by `benchmarksgame.build.deps.sh`
+- **Description:** Counts k-nucleotide frequencies (k=1,2) and specific subsequence occurrences in a 25M-nucleotide FASTA sequence. Uses a custom `Hashtbl.Make` with `Bytes` keys.
+- **Adaptation:** Accepts input file path as `argv[1]` (falls back to `"input25000000.txt"` for standalone use).
+
+### knucleotide3
+
+- **Source:** sandmark `benchmarks/benchmarksgame/knucleotide3.ml`
+- **Build:** dune (stdlib only), in `with_deps/benchmarksgame/`
+- **Args:** `<input-file>` — absolute path to `input25000000.txt`; generated by `benchmarksgame.build.deps.sh`
+- **Description:** Same k-nucleotide counting as `knucleotide` but with a packed-integer hash key optimisation (encodes bases as 2-bit values, avoiding `Bytes` allocation for keys ≤ 31 bases on 64-bit).
+- **Adaptation:** Accepts input file path as `argv[1]` (falls back to `"input25000000.txt"` for standalone use).
+
+### revcomp2
+
+- **Source:** sandmark `benchmarks/benchmarksgame/revcomp2.ml`
+- **Build:** dune (stdlib only), in `with_deps/benchmarksgame/`
+- **Args:** `<input-file>` — absolute path to `input25000000.txt`; generated by `benchmarksgame.build.deps.sh`
+- **Description:** Reverse-complement all DNA sequences in a FASTA file and print the result. Pure `Bytes`/string I/O; exercises buffer allocation and output.
+- **Adaptation:** Accepts input file path as `argv[1]` (falls back to `"input25000000.txt"` for standalone use).
+
+### regexredux2
+
+- **Source:** sandmark `benchmarks/benchmarksgame/regexredux2.ml`
+- **Build:** dune (`str` library), in `with_deps/benchmarksgame/`
+- **Args:** `<input-file>` — absolute path to `input5000000.txt`; generated by `benchmarksgame.build.deps.sh`
+- **Description:** Counts regex pattern matches in a 5M-nucleotide FASTA sequence, then applies a series of substitutions. Uses `Str` (OCaml's built-in regex library).
+- **Adaptation:** Accepts input file path as `argv[1]` (falls back to `"input5000000.txt"` for standalone use).
+
+---
+
+### primes
+
+- **Source:** sandmark `benchmarks/mpl/bench/primes/`
+- **Build:** dune (multi-library), in `with_deps/mpl/`; auto-installs `domainslib`
+- **Args:** `-N <int> -procs <int>` — parallel prime sieve; `-N` is the upper bound (default 100M), `-procs` is domain count
+- **Description:** Parallel sieve of Eratosthenes using the mpl Forkjoin library (wraps `Domainslib.Task`). OCaml ≥ 5 required.
+
+### msort_ints
+
+- **Source:** sandmark `benchmarks/mpl/bench/msort_ints/`
+- **Build:** dune (multi-library), in `with_deps/mpl/`; auto-installs `domainslib`
+- **Args:** `-N <int> -procs <int>` — array size (default 10M) and domain count
+- **Description:** Parallel merge sort on a random integer array using the mpl Seq/Merge/Quicksort libraries. OCaml ≥ 5 required.
+
+### msort_strings
+
+- **Source:** sandmark `benchmarks/mpl/bench/msort_strings/`
+- **Build:** dune (multi-library), in `with_deps/mpl/`; auto-installs `domainslib`
+- **Args:** `-f <words64.txt> -procs <int>` — absolute path to `inputs/words64.txt` (37 MB, bundled)
+- **Description:** Parallel merge sort on strings read from a word file. OCaml ≥ 5 required.
+
+### tokens
+
+- **Source:** sandmark `benchmarks/mpl/bench/tokens/`
+- **Build:** dune (multi-library), in `with_deps/mpl/`; auto-installs `domainslib`
+- **Args:** `-f <words.txt> --no-output -procs <int>` — absolute path to `inputs/words.txt` (590 KB, bundled)
+- **Description:** Parallel token frequency count using a concurrent hashset. OCaml ≥ 5 required.
+
+### raytracer
+
+- **Source:** sandmark `benchmarks/mpl/bench/raytracer/`
+- **Build:** dune (multi-library), in `with_deps/mpl/`; auto-installs `domainslib`
+- **Args:** `-n <width> -procs <int>` — image width in pixels (default 2000) and domain count
+- **Description:** Parallel ray tracer (rgbbox scene by default). Creates its own `Domainslib.Task` pool independently of the Forkjoin pool. OCaml ≥ 5 required.
 
 ---
 
@@ -359,6 +565,14 @@ Both in `benches/with_packages/thread-lwt/`; shared dune file.
 - **Args:** `-c <json-file>` — compact-print a JSON file; config uses the bundled `sample.json` (absolute path required since run cwd is a temp dir)
 - **Description:** Parses and pretty-prints a JSON document using the Yojson library. Exercises OCaml's `Buffer`-based output, recursive tree traversal, and moderate allocation from parsing.
 
+### test_sched
+
+- **Source:** sandmark `benchmarks/multicore-effects/ms_sched.ml` + `test_sched.ml` (adapted)
+- **Build:** ocamlfind + `saturn_lockfree`
+- **Args:** `<num_domains> <tasks_to_spawn> <list_length>`
+- **Description:** Microbenchmark for a concurrent round-robin effects-based scheduler (`ms_sched.ml`). Spawns `<tasks_to_spawn>` tasks per run, each allocating a list of length `<list_length>`. The scheduler uses a Saturn Michael–Scott queue as its run queue and `Domain.spawn` to run workers across `<num_domains>` domains. Exercises effect handler dispatch, continuation enqueuing, and domain coordination.
+- **Note:** In `with_packages/` (not `multicore/`) because it depends on `saturn_lockfree`. See `SANDMARK_ADAPTATIONS.md` for the porting changes from the sandmark original.
+
 ## multicore benchmarks
 
 Benchmarks that require OCaml 5.x and the `Effect` module. Source is in `multicore/`; the flat layout mirrors `simple/` (each benchmark in its own subfolder, with an optional `build.deps.sh` for generated data).
@@ -396,6 +610,34 @@ Single-file effect benchmarks compiled with `ocamlopt`. Adapted from sandmark `b
 - **Build:** ocamlopt (stdlib only)
 - **Args:** `<iters> <m> <n>` — default `2 3 11` (expected output per iter: 16381)
 - **Description:** Ackermann function. Same pattern; tests effect handler overhead on a deeply recursive, stack-intensive computation.
+
+#### effect_throughput_val
+
+- **Source:** sandmark `benchmarks/multicore-effects/effect_throughput_val.ml` (adapted)
+- **Build:** ocamlopt (stdlib only)
+- **Args:** `<n_iter>` — default `1_000_000`
+- **Description:** Measures the throughput of an effect handler block where `perform` is never called and a value is returned directly. The `E : unit Effect.t` handler is installed but never triggered; cost is purely the handler frame setup and teardown (stack allocation, context switch in/out, deallocation).
+
+#### effect_throughput_perform
+
+- **Source:** sandmark `benchmarks/multicore-effects/effect_throughput_perform.ml` (adapted)
+- **Build:** ocamlopt (stdlib only)
+- **Args:** `<n_iter>` — default `1_000_000`
+- **Description:** Measures the throughput of a full perform–resume cycle. `E : int -> int Effect.t` is performed once per iteration and the continuation is immediately resumed with the same value. Cost includes the perform (stack switch to handler), the `continue k x` call (stack switch back), and frame deallocation.
+
+#### effect_throughput_perform_drop
+
+- **Source:** sandmark `benchmarks/multicore-effects/effect_throughput_perform_drop.ml` (adapted)
+- **Build:** ocamlopt (stdlib only)
+- **Args:** `<n_iter>` — default `1_000_000`
+- **Description:** Like `effect_throughput_perform` but the continuation is abandoned (not resumed). Measures the perform overhead plus the cost of GC-collecting a dropped continuation.
+
+#### eratosthenes
+
+- **Source:** sandmark `benchmarks/multicore-effects/eratosthenes.ml` (adapted)
+- **Build:** ocamlopt (stdlib only)
+- **Args:** `<n>` — generate primes up to `n`; default `101`
+- **Description:** Message-passing Sieve of Eratosthenes implemented entirely with effects. Uses four effects (`Spawn`, `Yield`, `Send`, `Recv`) and two layered handlers: `run` (round-robin scheduler handling `Spawn`/`Yield`) and `mailbox` (per-pid message queue handling `Send`/`Recv`). The outer `mailbox` handler catches `Send`/`Recv` that bubble through `run`'s handler. Exercises effect handler chaining, continuation queuing, and a Map-backed mailbox.
 
 ### multicore/multicore-structures
 
@@ -625,6 +867,28 @@ Compilation order for both executables: `graphTypes → sparseGraph → generate
 
 ---
 
+## multicore/alloc_multicore
+
+### alloc_multicore
+
+- **Source:** sandmark `benchmarks/simple-tests/alloc_multicore.ml`
+- **Build:** ocamlopt (stdlib only — uses `Domain.spawn`/`Domain.join`)
+- **Args:** `<num_domains> <iterations>`; config uses `2 200_000`
+- **Description:** Parallel minor-heap allocation benchmark. Each domain allocates small mutable records `{ an_int; a_string; a_float }` in a tight loop. Measures allocation throughput under parallel GC pressure.
+
+---
+
+## multicore/pingpong_multicore
+
+### pingpong_multicore
+
+- **Source:** sandmark `benchmarks/simple-tests/pingpong_multicore.ml`
+- **Build:** ocamlfind + domainslib (auto-installed)
+- **Args:** `<num_domains> <chan_size> <total_messages>`; config uses `3 1 1000000`
+- **Description:** Multi-domain channel ping-pong benchmark using `Domainslib.Chan`. A producer sends messages through a pipeline of worker domains, each incrementing a counter before forwarding. Measures channel throughput and domain synchronisation overhead.
+
+---
+
 ## TODO — Benchmarks Not Yet Added
 
 ### Need external opam packages (not yet integrated)
@@ -632,7 +896,7 @@ Compilation order for both executables: `graphTypes → sparseGraph → generate
 These benchmarks were not added because their dependencies are complex or unusual.
 
 - **`valet`** — Requires `lwt`, `react`, and `uuidm`; unusual event-loop structure.
-- **`simple-tests` (partial)** — `ocamlcapi` and `weak_htbl` require C stubs or special build setup; `pingpong_multicore` requires `domainslib`.
+- **`simple-tests` (partial)** — `ocamlcapi` requires C stubs (skipped). `alloc_multicore` and `pingpong_multicore` are now ported (see `multicore/alloc_multicore/` and `multicore/pingpong_multicore/`).
 - **`irmin`** — Requires `irmin`, `irmin-pack`, `index`, and related packages.
 - **`owl`** — Requires `owl-base`.
 - **`mpl`** — Requires several packages (`mtime`, `progress`, etc.).
@@ -641,7 +905,7 @@ These benchmarks were not added because their dependencies are complex or unusua
 
 These benchmarks require `domainslib`, multiple domains, or OCaml 5 effect handlers, and are not meaningful on OCaml 4.x.
 
-- **`multicore-effects` (partial)** — `algorithmic_differentiation`, `rec_eff_fib`, `rec_seq_fib`, `rec_eff_tak`, `rec_seq_tak`, `rec_eff_ack`, `rec_seq_ack` are in `multicore/multicore-effects/`. Remaining: `queens` requires multi-shot continuations (`Obj.clone_continuation` / `Effect.Deep.clone_continuation`), which were removed in OCaml 5.2 and have no stdlib replacement yet; `eratosthenes` and `test_sched` require the external `lockfree` package.
+- **`multicore-effects` (partial)** — ported: `algorithmic_differentiation`, `rec_eff_fib`, `rec_seq_fib`, `rec_eff_tak`, `rec_seq_tak`, `rec_eff_ack`, `rec_seq_ack`, `effect_throughput_val`, `effect_throughput_perform`, `effect_throughput_perform_drop`, `eratosthenes`, `ms_sched`/`test_sched` (in `with_packages/test_sched/`). Remaining: `queens` and `effect_throughput_clone` require multi-shot continuations (`Obj.clone_continuation`), removed in OCaml 5.2 with no stdlib replacement.
 - **`multicore-grammatrix`** — Added to `multicore/multicore-grammatrix/`.
 - **`multicore-minilight`** — Added to `multicore/multicore-minilight/`.
 - **`multicore-numerical`** — Added to `multicore/multicore-numerical/`.

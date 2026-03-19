@@ -1,0 +1,3 @@
+(executable
+ (name minilight)
+ (modules camera image minilight rayTracer scene spatialIndex surfacePoint triangle vector3f))

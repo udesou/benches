@@ -7,7 +7,13 @@ Tested runtimes (as of 2026-03-17):
 - **OCaml trunk** — 5.6.0+dev (commit `02ee646`)
 - **OxCaml trunk** — Jane Street fork (commit `068b255`)
 
-77 benchmarks total across 10 suites.
+101 benchmarks total across 10 suites (counting each (benchmark, arg-set) pair
+for the stdlib and simple-tests multi-dispatch benchmarks).
+
+Note: compatibility matrix below reflects the state as of 2026-03-17 (81
+benchmarks). The 20 newly ported stdlib/ and simple-tests/ benchmarks have
+been verified to build on OCaml 5.4.1 but have not yet been swept across all
+5 runtimes.
 
 ## Compatibility Matrix
 

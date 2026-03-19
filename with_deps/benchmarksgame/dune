@@ -1,0 +1,8 @@
+(executables
+ (names fasta3 knucleotide knucleotide3 revcomp2)
+ (modules fasta3 knucleotide knucleotide3 revcomp2))
+
+(executable
+ (name regexredux2)
+ (modules regexredux2)
+ (libraries str))
