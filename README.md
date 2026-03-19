@@ -119,10 +119,10 @@ All programs are registered in `running-ng`'s `ocaml_gc_sweep_example.yml`.
 
 | Directory | Programs | Requires |
 |---|---|---|
-| `simple/` | 38 | stdlib / unix |
+| `simple/` | 39 | stdlib / unix |
 | `with_deps/` | 10 | dune multi-lib or generated data |
 | `with_packages/` | 20 | external opam packages |
-| `multicore/multicore-effects` | 11 | OCaml ≥ 5, effects |
+| `multicore/multicore-effects` | 17 | OCaml ≥ 5, effects |
 | `multicore/multicore-structures` | 7 | OCaml ≥ 5, stdlib Atomic |
 | `multicore/multicore-numerical` | 23 | OCaml ≥ 5, domainslib |
 | `multicore/multicore-grammatrix` | 2 | OCaml ≥ 5, domainslib |
@@ -131,7 +131,8 @@ All programs are registered in `running-ng`'s `ocaml_gc_sweep_example.yml`.
 | `multicore/pingpong_multicore` | 1 | OCaml ≥ 5, domainslib |
 | `multicore/graph500par` | 1 | OCaml ≥ 5, domainslib |
 | `multicore/oxcaml-prefetch` | 1 | OxCaml compiler fork |
-| **Total** | **116** | |
+| `multicore/multicore-gcroots` | 3 | OCaml ≥ 5, C stubs (`CAML_INTERNALS`) |
+| **Total** | **126** | |
 
 ### markbench
 
@@ -654,6 +655,27 @@ Single-file effect benchmarks compiled with `ocamlopt`. Adapted from sandmark `b
 - **Args:** `<n_iter>` — default `1_000_000`
 - **Description:** Like `effect_throughput_perform` but the continuation is abandoned (not resumed). Measures the perform overhead plus the cost of GC-collecting a dropped continuation.
 
+#### rec_eff_evenodd / rec_seq_evenodd
+
+- **Source:** sandmark `benchmarks/multicore-effects/rec_eff_evenodd.ml` / `rec_seq_evenodd.ml` (adapted / verbatim)
+- **Build:** ocamlopt (stdlib only)
+- **Args:** `<iters> <n>`; defaults `2 500_000_000`
+- **Description:** Even-odd mutual recursion benchmark. `rec_eff_evenodd` installs a dummy effect handler at each `odd` call; `rec_seq_evenodd` is the plain baseline. Measures effect handler call overhead on a tight mutual recursion loop.
+
+#### rec_eff_motzkin / rec_seq_motzkin
+
+- **Source:** sandmark `benchmarks/multicore-effects/rec_eff_motzkin.ml` / `rec_seq_motzkin.ml` (adapted / verbatim)
+- **Build:** ocamlopt (stdlib only)
+- **Args:** `<iters> <n>`; defaults `4 21`
+- **Description:** Computes the n'th Motzkin number (number of ways to draw non-intersecting chords between n circle points). `rec_eff_motzkin` wraps each recursive call in a dummy `try_with`; `rec_seq_motzkin` is the baseline. n=21 yields 142547559.
+
+#### rec_eff_sudan / rec_seq_sudan
+
+- **Source:** sandmark `benchmarks/multicore-effects/rec_eff_sudan.ml` / `rec_seq_sudan.ml` (adapted / verbatim)
+- **Build:** ocamlopt (stdlib only)
+- **Args:** `<iters> <n> <x> <y>`; defaults `10_000_000 2 2 2`
+- **Description:** Computes the Sudan function (recursive but not primitive recursive). `rec_eff_sudan` wraps the inner recursive call in a dummy `try_with`; `rec_seq_sudan` is the baseline. Defaults yield 15569256417.
+
 #### eratosthenes
 
 - **Source:** sandmark `benchmarks/multicore-effects/eratosthenes.ml` (adapted)
@@ -927,7 +949,7 @@ These benchmarks were not added because their dependencies are complex or unusua
 
 These benchmarks require `domainslib`, multiple domains, or OCaml 5 effect handlers, and are not meaningful on OCaml 4.x.
 
-- **`multicore-effects` (partial)** — ported: `algorithmic_differentiation`, `rec_eff_fib`, `rec_seq_fib`, `rec_eff_tak`, `rec_seq_tak`, `rec_eff_ack`, `rec_seq_ack`, `effect_throughput_val`, `effect_throughput_perform`, `effect_throughput_perform_drop`, `eratosthenes`, `ms_sched`/`test_sched` (in `with_packages/test_sched/`). Remaining: `queens` and `effect_throughput_clone` require multi-shot continuations (`Obj.clone_continuation`), removed in OCaml 5.2 with no stdlib replacement.
+- **`multicore-effects`** — fully ported: `algorithmic_differentiation`, `rec_eff_fib`, `rec_seq_fib`, `rec_eff_tak`, `rec_seq_tak`, `rec_eff_ack`, `rec_seq_ack`, `effect_throughput_val`, `effect_throughput_perform`, `effect_throughput_perform_drop`, `eratosthenes`, `rec_eff_evenodd`, `rec_seq_evenodd`, `rec_eff_motzkin`, `rec_seq_motzkin`, `rec_eff_sudan`, `rec_seq_sudan`, `ms_sched`/`test_sched` (in `with_packages/test_sched/`). Not ported: `queens` and `effect_throughput_clone` require multi-shot continuations (`Obj.clone_continuation`), removed in OCaml 5.2 with no stdlib replacement.
 - **`multicore-grammatrix`** — Added to `multicore/multicore-grammatrix/`.
 - **`multicore-minilight`** — Added to `multicore/multicore-minilight/`.
 - **`multicore-numerical`** — Added to `multicore/multicore-numerical/`.

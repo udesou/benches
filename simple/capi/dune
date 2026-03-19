@@ -1,0 +1,11 @@
+(executable
+ (name capi)
+ (modules capi)
+ (libraries ocamlcapi)
+ (modes native))
+
+(library
+ (name ocamlcapi)
+ (modules ocamlcapi)
+ (foreign_stubs (language c) (names ocamlcapi))
+ (modes native))
